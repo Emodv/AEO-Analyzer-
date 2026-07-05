@@ -1,0 +1,6 @@
+{
+  "name": "AEO Analyzer",
+  "description": "An auditing tool that scans websites for Agentic Engine Optimization (AEO) compliance, scores them across 8 checkpoints, and captures leads.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
