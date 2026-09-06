@@ -1,37 +1,42 @@
-// scoring.test.ts
-import { CheckpointResult, ChecksObject } from '../types';
+import { ChecksObject, CheckpointResult } from '../types';
+import { calculateAeoScore, getAeoStatus, CHECKPOINT_WEIGHTS } from '../lib/scanner/scoring';
 
-export function calculateScore(passesCount: number): { score: number; status: string } {
-  const score = Math.round(passesCount * 12.5);
-  const status =
-    score >= 85 ? 'AI-Ready' :
-    score >= 70 ? 'Needs Work' :
-                  'Urgent Action Required';
-  return { score, status };
-}
+const result = (pass: boolean): CheckpointResult => ({ pass, label: 'test', detail: 'test' });
+const checks = (passing: Array<keyof ChecksObject>): ChecksObject => ({
+  checkpoint_1: result(passing.includes('checkpoint_1')),
+  checkpoint_2: result(passing.includes('checkpoint_2')),
+  checkpoint_3: result(passing.includes('checkpoint_3')),
+  checkpoint_4: result(passing.includes('checkpoint_4')),
+  checkpoint_5: result(passing.includes('checkpoint_5')),
+  checkpoint_6: result(passing.includes('checkpoint_6')),
+  checkpoint_7: result(passing.includes('checkpoint_7')),
+  checkpoint_8: result(passing.includes('checkpoint_8')),
+});
 
-describe('AEO Scoring Calculations', () => {
-  it('should return a score of 0 and Urgent Action Required for 0 passes', () => {
-    const { score, status } = calculateScore(0);
-    expect(score).toBe(0);
-    expect(status).toBe('Urgent Action Required');
+describe('evidence-weighted AEO scoring', () => {
+  it('weights sum to 100', () => {
+    expect(Object.values(CHECKPOINT_WEIGHTS).reduce((a, b) => a + b, 0)).toBe(100);
   });
 
-  it('should return a score of 50 and Urgent Action Required for 4 passes', () => {
-    const { score, status } = calculateScore(4);
-    expect(score).toBe(50);
-    expect(status).toBe('Urgent Action Required');
+  it('does not penalize an otherwise strong site for missing experimental agent policy', () => {
+    const allExceptExperimental = checks([
+      'checkpoint_1','checkpoint_2','checkpoint_3','checkpoint_5','checkpoint_6','checkpoint_7','checkpoint_8'
+    ]);
+    expect(calculateAeoScore(allExceptExperimental)).toBe(100);
+    expect(getAeoStatus(100)).toBe('AI-Ready');
   });
 
-  it('should return a score of 100 and AI-Ready for 8 passes', () => {
-    const { score, status } = calculateScore(8);
-    expect(score).toBe(100);
-    expect(status).toBe('AI-Ready');
+  it('gives llms.txt a small emerging-signal weight rather than equal weight', () => {
+    expect(calculateAeoScore(checks(['checkpoint_3']))).toBe(5);
   });
 
-  it('should return Needs Work for 6 passes (75 score)', () => {
-    const { score, status } = calculateScore(6);
+  it('prioritizes established crawlability and structured content fundamentals', () => {
+    const score = calculateAeoScore(checks(['checkpoint_1','checkpoint_2','checkpoint_5','checkpoint_6']));
     expect(score).toBe(75);
-    expect(status).toBe('Needs Work');
+    expect(getAeoStatus(score)).toBe('Needs Work');
+  });
+
+  it('returns urgent status when core retrieval fundamentals are weak', () => {
+    expect(getAeoStatus(calculateAeoScore(checks(['checkpoint_3','checkpoint_4'])))).toBe('Urgent Action Required');
   });
 });
